@@ -268,6 +268,20 @@ async function freezeAssetForAccount({
   return `✅ Asset freeze transaction sent. TxID: ${signedTxn.txID}`;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function countdown(seconds) {
+  console.log(`⏳ Revocation will happen in ${seconds} seconds...`);
+  for (let i = seconds; i > 0; i--) {
+    process.stdout.write(`⏳ ${i} `);
+    await delay(1000); // wait 1 second
+  }
+  console.log("\n🚨 Time's up! Executing clawback...");
+}
+
+
 async function revokeAsset({
   clawbackMnemonic,
   assetId,
@@ -285,23 +299,11 @@ async function revokeAsset({
   if (accountInfo.amount < minBalance) {
     console.log(`⚠️ Clawback account has low balance (${accountInfo.amount} microAlgos). Prompting to fund...`);
 
-    // Prompt to fund the account (uses testnet faucet or wallet depending on environment)
-    await algokit.promptToFundAccount({
-      address: receiver.addr
-    });
-  }
 
   console.log(
     "🔁 Checking if original creator has opted in before clawback..."
   );
 
-  const optInBackResult = await optInToAssetIfNotOptedIn({
-    mnemonic: receiver,
-    assetId: BigInt(assetId),
-    algodClient,
-  });
-  const receiverAccount = algosdk.mnemonicToSecretKey(receiver);
-  console.log(optInBackResult);
 
   // 4. Get suggested params
   const suggestedParams = await algodClient.getTransactionParams().do();
@@ -309,7 +311,7 @@ async function revokeAsset({
   // 5. Construct asset clawback transaction
   const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
     sender: clawbackAccount.addr,
-    receiver: receiverAccount.addr,
+    receiver: receiver,
     assetIndex: assetId,
     amount: amount,
     revokeFrom: revokeFrom,
@@ -320,7 +322,7 @@ async function revokeAsset({
   const signedTxn = algosdk.signTransaction(txn, clawbackAccount.sk);
 
   // 7. Send the transaction
-  await algodClient.sendRawTransaction(signedTxn.blob).do();
+  const sol = await algodClient.sendRawTransaction(signedTxn.blob).do();
 
   // 8. Wait for confirmation
   const result = await algosdk.waitForConfirmation(
@@ -329,7 +331,8 @@ async function revokeAsset({
     10
   );
 
-  return `Asset revoke (clawback) transaction sent. TxID:`, result;
+  return `Asset revoke (clawback) transaction sent. TxID:`, sol;
+}
 }
 
 // ✅ Main Function
@@ -438,18 +441,44 @@ async function main() {
   console.log("⏳ Please fund the receiver address too (for opt-in)");
   await promptToFundAccount(receiver.addr);
 
+  
+  console.log("🚪 Opting-in receiver account...");
+  const revokeoptInResult = await optInToAssetIfNotOptedIn({
+    mnemonic: receiverm,
+    assetId: BigInt(assetId),
+    algodClient,
+  });
+  console.log(revokeoptInResult);
   console.log("🦞 Revoking NFT (clawback from receiver back to creator)...");
 
   const revokeResult = await revokeAsset({
     clawbackMnemonic: mnemonic,
     assetId: BigInt(assetId),
     revokeFrom: receiverAccount.addr,
-    receiver: receiverm,
+    receiver: receiver.addr,
     amount: 1,
     algodClient,
   });
 
   console.log(revokeResult);
+
+console.log("🦞 Preparing to revoke NFT with timer(clawback from receiver)...");
+
+const delaySeconds = 10; // ⏱️ customize your delay here
+
+await countdown(delaySeconds); // shows countdown in terminal
+
+const revokeResulttime = await revokeAsset({
+  clawbackMnemonic: mnemonic,
+  assetId: BigInt(assetId),
+  revokeFrom: receiverAccount.addr,
+  receiver: receiver.addr,
+  amount: 1,
+  algodClient,
+});
+
+console.log(revokeResulttime);
+
   process.exit();
 }
 
