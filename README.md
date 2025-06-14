@@ -58,7 +58,6 @@ node server.js
 > [https://your-deployment-url.com](https://your-deployment-url.com)  
 > _All endpoints are available under this root URL._
 
----
 
 ## 🛠️ API Reference
 
