@@ -54,7 +54,9 @@ npm install
 node server.js
 ```
 
-> 🔉 Server runs at: `http://localhost:5000`
+## 🌐 Root API URL  
+> [https://your-deployment-url.com](https://your-deployment-url.com)  
+> _All endpoints are available under this root URL._
 
 ---
 
